@@ -1,4 +1,4 @@
-# EchoAgent
+# EchoFoundryAgent
 
 This sample is an updated version of the EchoBot template that uses the Azure AI Foundry SDK and Microsoft 365 Agents SDK to create an agent that can respond to user queries in Microsoft Teams or Microsoft 365 Copilot Chat.
 
