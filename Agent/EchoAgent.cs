@@ -15,7 +15,7 @@ public class EchoAgent : AgentApplication
     private readonly AIProjectClient _projectClient;
     private readonly string _agentId;
 
-    public EchoAgent(AgentApplicationOptions options, IConfiguration configuration): base(options)
+    public EchoAgent(AgentApplicationOptions options, IConfiguration configuration) : base(options)
     {
         var agentConfig = configuration.GetSection("AzureAIAgentConfiguration").Get<AzureAIAgentConfiguration>();
         _projectClient = AzureAIAgent.CreateAzureAIClient(agentConfig.ConnectionString, new AzureCliCredential());
@@ -55,11 +55,10 @@ public class EchoAgent : AgentApplication
             var message = new ChatMessageContent(AuthorRole.User, turnContext.Activity.Text);
 
             // stream the chat response
-            await foreach (StreamingChatMessageContent response in agent.InvokeStreamingAsync(message, cancellationToken: cancellationToken))
-            {
-                var content = string.IsNullOrEmpty(response.Content) ? "" : response.Content.ToString();
-                turnContext.StreamingResponse.QueueTextChunk(content);
-            }
+            await foreach (StreamingChatMessageContent chunk in agent.InvokeStreamingAsync(message, cancellationToken: cancellationToken))
+            {                
+                turnContext.StreamingResponse.QueueTextChunk(chunk.Content);
+            }            
         }
         finally
         {
