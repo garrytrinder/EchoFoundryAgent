@@ -16,6 +16,7 @@ It demonstrates how to:
 ## Minimal steps to awesome
 
 1. Create an Azure AI Foundry project and Agent with instructions
+1. Add knowledge to the Agent using the Files datasource, upload documents from the `Assets` folder in the project 
 1. In TeamsApp project, open the `env` folder, rename `.env.local.user.sample` to `.env.local.user`, and `.env.local.sample` to `.env.local`.
 1. In `.env.local.user` file, replace `<AzureAIFoundryProjectConnectionString>` with the connection string of your Azure AI Foundry project.
 1. In `.env.local` file, replace `<AzureAIFoundryAgentId>` with the ID of the agent you created in the Azure AI Foundry project.
