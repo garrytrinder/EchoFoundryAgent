@@ -1,4 +1,4 @@
-﻿namespace EchoAgent
+﻿namespace EchoAgent.Models
 {
     public class AzureAIAgentConfiguration
     {
