@@ -1,16 +1,17 @@
 # EchoFoundryAgent
 
-This sample is an updated version of the EchoBot template that uses the Azure AI Foundry SDK and Microsoft 365 Agents SDK to create an agent that can respond to user queries in Microsoft Teams or Microsoft 365 Copilot Chat.
+This sample is an updated version of the EchoBot template that uses the Azure AI Foundry SDK, Semantic Kernel and Microsoft 365 Agents SDK to create an agent that can respond to user queries in Microsoft Teams or Microsoft 365 Copilot as a custom engine agent.
 
 It demonstrates how to:
 
 - Use Azure AI Foundry SDK to connect to an Agent in an Azure AI Foundry Project 
 - Use Semantic Kernel to handle the conversation and call the Azure AI Foundry Agent
-- Use Microsoft 365 Agents SDK to return streamed responses to the user in Teams, or Copilot
+- Use Microsoft 365 Agents SDK to return streamed responses including citations to the user in Teams, and Copilot
+- Use Microsoft 365 Agents SDK to add labels, AI generated and Sensitivity labels to messages returned in Teams
 
 ## Prerequisites
 
-- Visual Studio 2022 17.14.0 Preview 5 with Microsoft Teams development tools workload installed
+- Visual Studio 2022 17.14.0 Preview with Microsoft Teams development tools workload installed
 - Microsoft 365 Copilot licence (to use in Microsoft 365 Copilot Chat)
 
 ## Minimal steps to awesome
