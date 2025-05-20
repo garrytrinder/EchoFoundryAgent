@@ -1,4 +1,4 @@
-﻿using Azure.AI.Projects;
+﻿using Azure.AI.Agents.Persistent;
 using Azure.Identity;
 using EchoAgent.Models;
 using Microsoft.Agents.Builder;
@@ -14,13 +14,13 @@ namespace EchoAgent.Agent;
 
 public class EchoAgent : AgentApplication
 {
-    private readonly AIProjectClient _projectClient;
+    private readonly PersistentAgentsClient _projectClient;
     private readonly string _agentId;
 
     public EchoAgent(AgentApplicationOptions options, IConfiguration configuration) : base(options)
     {
         var agentConfig = configuration.GetSection("AzureAIAgentConfiguration").Get<AzureAIAgentConfiguration>();
-        _projectClient = AzureAIAgent.CreateAzureAIClient(agentConfig.ConnectionString, new AzureCliCredential());
+        _projectClient = new PersistentAgentsClient(agentConfig.ProjectEndpoint, new DefaultAzureCredential());
         _agentId = agentConfig.AgentId;
     }
 
@@ -39,10 +39,8 @@ public class EchoAgent : AgentApplication
     [Route(RouteType = RouteType.Activity, Type = ActivityTypes.Message, Rank = RouteRank.Last)]
     protected async Task OnMessageAsync(ITurnContext turnContext, ITurnState turnState, CancellationToken cancellationToken)
     {
-        // get the Azure AI Agent
-        var agentClient = _projectClient.GetAgentsClient();
-        var agentModel = await agentClient.GetAgentAsync(_agentId, cancellationToken);
-        var agent = new AzureAIAgent(agentModel, agentClient);
+        var agentModel = await _projectClient.Administration.GetAgentAsync(_agentId, cancellationToken);
+        var agent = new AzureAIAgent(agentModel, _projectClient);
 
         try
         {
@@ -68,12 +66,12 @@ public class EchoAgent : AgentApplication
                 foreach (StreamingAnnotationContent annotation in annotations)
                 {
                     // check if the file reference already exists in the list and skip it if it does
-                    if (fileReferences.Any(fr => fr.Quote == annotation.Quote)) { continue; }
+                    if (fileReferences.Any(fr => fr.Quote == annotation.Label)) { continue; }
                    
-                    var agentFile = await agent.Client.GetFileAsync(annotation.FileId, cancellationToken);
+                    var agentFile = await agent.Client.Files.GetFileAsync(annotation.ReferenceId, cancellationToken);
                     var citation = new Citation(string.Empty, agentFile.Value.Filename, "https://m365.cloud.microsoft/chat");
 
-                    var fileReference = new FileReference(agentFile.Value.Id, agentFile.Value.Filename, annotation.Quote, citation);
+                    var fileReference = new FileReference(agentFile.Value.Id, agentFile.Value.Filename, annotation.Label, citation);
                     fileReferences.Add(fileReference);
                 }
 

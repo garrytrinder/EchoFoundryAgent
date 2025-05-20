@@ -2,7 +2,10 @@
 {
     public class AzureAIAgentConfiguration
     {
-        public string AgentId { get; set; } = string.Empty;
-        public string ConnectionString { get; set; } = string.Empty;
+        public string AgentId { get; set; }
+        public string ProjectEndpoint { get; set; }
+        public string SubscriptionId { get; set; }
+        public string ResourceGroupName { get; set; }
+        public string ProjectName { get; set; }
     }
 }

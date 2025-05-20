@@ -49,8 +49,8 @@ provision:
               ClientId: ${{AGENT_ID}}
               ClientSecret: ${{SECRET_AGENT_PASSWORD}}
         AzureAIAgentConfiguration:
-          AgentId: ${{AZURE_AI_AGENT_ID}}
-          ConnectionString: ${{SECRET_AZURE_AI_PROJECT_CONNECTION_STRING}}
+          AgentId: ${{AZURE_AI_FOUNDRY_PROJECT_AGENT_ID}}
+          ProjectEndpoint: ${{AZURE_AI_FOUNDRY_PROJECT_ENDPOINT}}
 
   # Create or update the bot registration on dev.botframework.com
   - uses: botFramework/create
