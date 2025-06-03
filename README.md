@@ -11,7 +11,7 @@ It demonstrates how to:
 
 ## Prerequisites
 
-- Visual Studio 2022 17.14.0 Preview with Microsoft Teams development tools workload installed
+- Visual Studio 2022 17.14.0 Preview, (or higher) with Microsoft Teams development tools workload installed
 - Microsoft 365 Copilot licence (to use in Microsoft 365 Copilot Chat)
 
 ## Minimal steps to awesome
@@ -19,7 +19,6 @@ It demonstrates how to:
 1. Create an Azure AI Foundry project and Agent with instructions
 1. Add knowledge to the Agent using the Files datasource, upload documents from the `Assets` folder in the project 
 1. In TeamsApp project, open the `env` folder, rename `.env.local.user.sample` to `.env.local.user`, and `.env.local.sample` to `.env.local`.
-1. In `.env.local.user` file, replace `<AzureAIFoundryProjectConnectionString>` with the connection string of your Azure AI Foundry project.
-1. In `.env.local` file, replace `<AzureAIFoundryAgentId>` with the ID of the agent you created in the Azure AI Foundry project.
+1. In `.env.local` file, replace `<AzureAIProjectAgentId>` with the ID of the agent and `<AzureAIProjectEndpoint>` for the agent and project you created in Azure AI Foundry.
 1. In Visual Studio, create a public Dev Tunnel.
 1. Select `Microsoft Teams (browser)` as the startup project and start a debug session (F5). This will open Microsoft Teams in your browser and the app installation dialog.
