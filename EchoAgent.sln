@@ -5,7 +5,7 @@ VisualStudioVersion = 17.14.36022.41
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EchoAgent", "EchoAgent.csproj", "{E73EBAB7-2CCC-987C-02ED-BE08CC12284B}"
 EndProject
-Project("{A9E3F50B-275E-4AF7-ADCE-8BE12D41E305}") = "TeamsApp", "TeamsApp\TeamsApp.ttkproj", "{3DF7DBBF-6757-C96E-D6EC-3928332DA9E0}"
+Project("{A9E3F50B-275E-4AF7-ADCE-8BE12D41E305}") = "M365Agent", "M365Agent\M365Agent.atkproj", "{3DF7DBBF-6757-C96E-D6EC-3928332DA9E0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
