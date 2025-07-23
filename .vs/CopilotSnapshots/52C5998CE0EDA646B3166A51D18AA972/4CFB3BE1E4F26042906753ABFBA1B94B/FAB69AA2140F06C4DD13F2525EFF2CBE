@@ -1,0 +1,70 @@
+﻿using Microsoft.Agents.Core.Models;
+using Microsoft.SemanticKernel.ChatCompletion;
+
+namespace EchoAgent.Services;
+
+/// <summary>
+/// Service for processing message content and handling citations.
+/// </summary>
+public class MessageContentProcessor : IMessageContentProcessor
+{
+    private const char AnnotationStartMarker = '【';
+
+    /// <summary>
+    /// Processes the text content of message chunks, handling citations and regular text.
+    /// </summary>
+    public async Task ProcessMessageContentAsync(
+        StreamingChatMessageContent messageChunk, 
+        ITurnContext turnContext, 
+        MessageProcessingContext context)
+    {
+        ArgumentNullException.ThrowIfNull(messageChunk);
+        ArgumentNullException.ThrowIfNull(turnContext);
+        ArgumentNullException.ThrowIfNull(context);
+
+        // Skip empty content (happens when chunk contains only annotations)
+        if (messageChunk.Content == null) 
+        {
+            return;
+        }
+
+        // Process pending citation quote from previous chunk
+        if (!string.IsNullOrEmpty(context.PendingCitationQuote))
+        {
+            await ProcessPendingCitationAsync(turnContext, context).ConfigureAwait(false);
+            return;
+        }
+
+        // Handle citation markers in content
+        if (messageChunk.Content.Contains(AnnotationStartMarker))
+        {
+            // Store citation quote for next chunk processing
+            context.PendingCitationQuote = messageChunk.Content;
+        }
+        else
+        {
+            // Regular text content - send directly to user
+            turnContext.StreamingResponse.QueueTextChunk(messageChunk.Content);
+        }
+    }
+
+    /// <summary>
+    /// Processes a pending citation quote and adds the citation reference number.
+    /// </summary>
+    public async Task ProcessPendingCitationAsync(ITurnContext turnContext, MessageProcessingContext context)
+    {
+        ArgumentNullException.ThrowIfNull(turnContext);
+        ArgumentNullException.ThrowIfNull(context);
+
+        var citationIndex = context.FileReferences.FindIndex(fr => fr.Quote == context.PendingCitationQuote);
+        if (citationIndex >= 0)
+        {
+            turnContext.StreamingResponse.QueueTextChunk($" [{citationIndex + 1}] ");
+        }
+        
+        // Clear pending citation
+        context.PendingCitationQuote = string.Empty;
+        
+        await Task.CompletedTask.ConfigureAwait(false);
+    }
+}

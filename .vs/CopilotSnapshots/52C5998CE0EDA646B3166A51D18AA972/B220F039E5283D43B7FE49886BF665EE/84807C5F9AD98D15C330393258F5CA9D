@@ -1,0 +1,278 @@
+﻿using Azure.AI.Agents.Persistent;
+using Azure.Identity;
+using EchoAgent.Models;
+using Microsoft.Agents.Builder;
+using Microsoft.Agents.Builder.App;
+using Microsoft.Agents.Builder.State;
+using Microsoft.Agents.Core.Models;
+using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.Agents;
+using Microsoft.SemanticKernel.Agents.AzureAI;
+using Microsoft.SemanticKernel.ChatCompletion;
+
+namespace EchoAgent.Agent;
+
+/// <summary>
+/// An agent that echoes user messages using Azure AI Agent services with streaming response capabilities.
+/// </summary>
+public class EchoAgent : AgentApplication
+{
+    private readonly PersistentAgentsClient _projectClient;
+    private readonly string _agentId;
+
+    // Constants for better maintainability
+    private const string WelcomeMessage = "Hello and Welcome!";
+    private const string WorkingMessage = "Working on it...";
+    private const string CitationLinkUrl = "https://m365.cloud.microsoft/chat";
+    private const string SensitivityLabelName = "General";
+    private const string SensitivityLabelDescription = "Business data which is NOT meant for public consumption. This can be shared with internal employees, business guests and external partners as needed.";
+    private const char AnnotationStartMarker = '【';
+
+    public EchoAgent(AgentApplicationOptions options, IConfiguration configuration) : base(options)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        
+        var agentConfig = configuration.GetSection("AzureAIAgentConfiguration").Get<AzureAIAgentConfiguration>();
+        if (agentConfig?.ProjectEndpoint == null)
+        {
+            throw new InvalidOperationException("AzureAIAgentConfiguration section is missing or invalid in configuration.");
+        }
+        
+        _projectClient = new PersistentAgentsClient(agentConfig.ProjectEndpoint, new DefaultAzureCredential());
+        _agentId = agentConfig.AgentId ?? throw new InvalidOperationException("AgentId is required in AzureAIAgentConfiguration.");
+    }
+
+    /// <summary>
+    /// Handles the welcome message when new members are added to the conversation.
+    /// </summary>
+    [Route(RouteType = RouteType.Conversation, EventName = ConversationUpdateEvents.MembersAdded)]
+    protected async Task WelcomeMessageAsync(ITurnContext turnContext, ITurnState turnState, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(turnContext);
+        ArgumentNullException.ThrowIfNull(turnState);
+
+        if (turnContext.Activity?.MembersAdded == null)
+        {
+            return;
+        }
+
+        foreach (ChannelAccount member in turnContext.Activity.MembersAdded)
+        {
+            if (member.Id != turnContext.Activity.Recipient?.Id)
+            {
+                await turnContext.SendActivityAsync(MessageFactory.Text(WelcomeMessage), cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Processes incoming messages and streams responses from the Azure AI Agent.
+    /// </summary>
+    [Route(RouteType = RouteType.Activity, Type = ActivityTypes.Message, Rank = RouteRank.Last)]
+    protected async Task OnMessageAsync(ITurnContext turnContext, ITurnState turnState, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(turnContext);
+        ArgumentNullException.ThrowIfNull(turnState);
+
+        if (string.IsNullOrEmpty(turnContext.Activity?.Text))
+        {
+            return;
+        }
+
+        var agentModel = await _projectClient.Administration.GetAgentAsync(_agentId, cancellationToken).ConfigureAwait(false);
+        var agent = new AzureAIAgent(agentModel, _projectClient);
+
+        try
+        {
+            await InitializeResponseAsync(turnContext, turnState, cancellationToken).ConfigureAwait(false);
+            
+            var userMessage = new ChatMessageContent(AuthorRole.User, turnContext.Activity.Text);
+            var processingContext = new MessageProcessingContext();
+
+            await ProcessAgentResponseStreamAsync(agent, userMessage, turnContext, processingContext, cancellationToken).ConfigureAwait(false);
+            
+            await FinalizeResponseAsync(turnContext, processingContext, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            await turnContext.StreamingResponse.EndStreamAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Initializes the streaming response with working message and message count.
+    /// </summary>
+    private static async Task InitializeResponseAsync(ITurnContext turnContext, ITurnState turnState, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(turnContext);
+        ArgumentNullException.ThrowIfNull(turnState);
+
+        await turnContext.StreamingResponse.QueueInformativeUpdateAsync(WorkingMessage, cancellationToken).ConfigureAwait(false);
+        
+        int messageCount = turnState.Conversation.IncrementMessageCount();
+        turnContext.StreamingResponse.QueueTextChunk($"({messageCount}) ");
+    }
+
+    /// <summary>
+    /// Processes the streaming response from the Azure AI Agent.
+    /// </summary>
+    private async Task ProcessAgentResponseStreamAsync(
+        AzureAIAgent agent, 
+        ChatMessageContent userMessage, 
+        ITurnContext turnContext, 
+        MessageProcessingContext context, 
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(agent);
+        ArgumentNullException.ThrowIfNull(userMessage);
+        ArgumentNullException.ThrowIfNull(turnContext);
+        ArgumentNullException.ThrowIfNull(context);
+
+        await foreach (StreamingChatMessageContent messageChunk in agent.InvokeStreamingAsync(userMessage, cancellationToken: cancellationToken).ConfigureAwait(false))
+        {
+            await ProcessAnnotationsAsync(messageChunk, agent, context, cancellationToken).ConfigureAwait(false);
+            await ProcessMessageContentAsync(messageChunk, turnContext, context).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Processes annotation content from message chunks and builds file references.
+    /// </summary>
+    private async Task ProcessAnnotationsAsync(
+        StreamingChatMessageContent messageChunk, 
+        AzureAIAgent agent, 
+        MessageProcessingContext context, 
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(messageChunk);
+        ArgumentNullException.ThrowIfNull(agent);
+        ArgumentNullException.ThrowIfNull(context);
+
+        var annotations = messageChunk.Items.OfType<StreamingAnnotationContent>();
+        
+        foreach (StreamingAnnotationContent annotation in annotations)
+        {
+            // Skip if we already have this file reference
+            if (context.FileReferences.Any(fr => fr.Quote == annotation.Label)) 
+            {
+                continue;
+            }
+
+            var fileReference = await CreateFileReferenceAsync(annotation, agent, cancellationToken).ConfigureAwait(false);
+            context.FileReferences.Add(fileReference);
+        }
+    }
+
+    /// <summary>
+    /// Creates a file reference from annotation data.
+    /// </summary>
+    private async Task<FileReference> CreateFileReferenceAsync(
+        StreamingAnnotationContent annotation, 
+        AzureAIAgent agent, 
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(annotation);
+        ArgumentNullException.ThrowIfNull(agent);
+
+        var agentFile = await agent.Client.Files.GetFileAsync(annotation.ReferenceId, cancellationToken).ConfigureAwait(false);
+        var citation = new Citation(string.Empty, agentFile.Value.Filename, CitationLinkUrl);
+        
+        return new FileReference(
+            agentFile.Value.Id, 
+            agentFile.Value.Filename, 
+            annotation.Label, 
+            citation);
+    }
+
+    /// <summary>
+    /// Processes the text content of message chunks, handling citations and regular text.
+    /// </summary>
+    private static async Task ProcessMessageContentAsync(
+        StreamingChatMessageContent messageChunk, 
+        ITurnContext turnContext, 
+        MessageProcessingContext context)
+    {
+        ArgumentNullException.ThrowIfNull(messageChunk);
+        ArgumentNullException.ThrowIfNull(turnContext);
+        ArgumentNullException.ThrowIfNull(context);
+
+        // Skip empty content (happens when chunk contains only annotations)
+        if (messageChunk.Content == null) 
+        {
+            return;
+        }
+
+        // Process pending citation quote from previous chunk
+        if (!string.IsNullOrEmpty(context.PendingCitationQuote))
+        {
+            await ProcessPendingCitationAsync(turnContext, context).ConfigureAwait(false);
+            return;
+        }
+
+        // Handle citation markers in content
+        if (messageChunk.Content.Contains(AnnotationStartMarker))
+        {
+            // Store citation quote for next chunk processing
+            context.PendingCitationQuote = messageChunk.Content;
+        }
+        else
+        {
+            // Regular text content - send directly to user
+            turnContext.StreamingResponse.QueueTextChunk(messageChunk.Content);
+        }
+    }
+
+    /// <summary>
+    /// Processes a pending citation quote and adds the citation reference number.
+    /// </summary>
+    private static async Task ProcessPendingCitationAsync(ITurnContext turnContext, MessageProcessingContext context)
+    {
+        ArgumentNullException.ThrowIfNull(turnContext);
+        ArgumentNullException.ThrowIfNull(context);
+
+        var citationIndex = context.FileReferences.FindIndex(fr => fr.Quote == context.PendingCitationQuote);
+        if (citationIndex >= 0)
+        {
+            turnContext.StreamingResponse.QueueTextChunk($" [{citationIndex + 1}] ");
+        }
+        
+        // Clear pending citation
+        context.PendingCitationQuote = string.Empty;
+        
+        await Task.CompletedTask.ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Finalizes the streaming response with metadata and citations.
+    /// </summary>
+    private async Task FinalizeResponseAsync(ITurnContext turnContext, MessageProcessingContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(turnContext);
+        ArgumentNullException.ThrowIfNull(context);
+
+        // Enable AI generation label
+        turnContext.StreamingResponse.EnableGeneratedByAILabel = true;
+
+        // Add sensitivity label
+        turnContext.StreamingResponse.SensitivityLabel = new SensitivityUsageInfo()
+        {
+            Name = SensitivityLabelName,
+            Description = SensitivityLabelDescription
+        };
+
+        // Add citations from file references
+        var citations = context.FileReferences.Select(fr => fr.Citation).ToList();
+        turnContext.StreamingResponse.AddCitations(citations);
+        
+        await Task.CompletedTask.ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Context class to maintain state during message processing.
+    /// </summary>
+    private sealed class MessageProcessingContext
+    {
+        public List<FileReference> FileReferences { get; } = new();
+        public string PendingCitationQuote { get; set; } = string.Empty;
+    }
+}

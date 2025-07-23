@@ -1,0 +1,12 @@
+﻿using EchoAgent.Models;
+
+namespace EchoAgent.Services;
+
+/// <summary>
+/// Context class to maintain state during message processing.
+/// </summary>
+public sealed class MessageProcessingContext
+{
+    public List<FileReference> FileReferences { get; } = new();
+    public string PendingCitationQuote { get; set; } = string.Empty;
+}

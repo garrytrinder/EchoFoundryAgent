@@ -1,0 +1,29 @@
+﻿using Microsoft.Agents.Core.Models;
+using Microsoft.SemanticKernel.Agents.AzureAI;
+using Microsoft.SemanticKernel.ChatCompletion;
+using EchoAgent.Models;
+
+namespace EchoAgent.Services;
+
+/// <summary>
+/// Service for processing annotations from streaming chat messages.
+/// </summary>
+public interface IAnnotationProcessor
+{
+    /// <summary>
+    /// Processes annotation content from message chunks and builds file references.
+    /// </summary>
+    Task ProcessAnnotationsAsync(
+        StreamingChatMessageContent messageChunk, 
+        AzureAIAgent agent, 
+        MessageProcessingContext context, 
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Creates a file reference from annotation data.
+    /// </summary>
+    Task<FileReference> CreateFileReferenceAsync(
+        StreamingAnnotationContent annotation, 
+        AzureAIAgent agent, 
+        CancellationToken cancellationToken);
+}

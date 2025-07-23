@@ -1,0 +1,107 @@
+﻿using Azure.AI.Agents.Persistent;
+using Azure.Identity;
+using EchoAgent.Models;
+using EchoAgent.Services;
+using Microsoft.Agents.Builder;
+using Microsoft.Agents.Builder.App;
+using Microsoft.Agents.Builder.State;
+using Microsoft.Agents.Core.Models;
+using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.Agents;
+using Microsoft.SemanticKernel.Agents.AzureAI;
+using Microsoft.SemanticKernel.ChatCompletion;
+
+namespace EchoAgent.Agent;
+
+/// <summary>
+/// An agent that echoes user messages using Azure AI Agent services with streaming response capabilities.
+/// </summary>
+public class EchoAgent : AgentApplication
+{
+    private readonly PersistentAgentsClient _projectClient;
+    private readonly string _agentId;
+    private readonly IStreamingResponseManager _streamingResponseManager;
+    private readonly IAgentResponseProcessor _agentResponseProcessor;
+
+    // Constants for better maintainability
+    private const string WelcomeMessage = "Hello and Welcome!";
+
+    public EchoAgent(
+        AgentApplicationOptions options, 
+        IConfiguration configuration,
+        IStreamingResponseManager streamingResponseManager,
+        IAgentResponseProcessor agentResponseProcessor) : base(options)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(streamingResponseManager);
+        ArgumentNullException.ThrowIfNull(agentResponseProcessor);
+        
+        var agentConfig = configuration.GetSection("AzureAIAgentConfiguration").Get<AzureAIAgentConfiguration>();
+        if (agentConfig?.ProjectEndpoint == null)
+        {
+            throw new InvalidOperationException("AzureAIAgentConfiguration section is missing or invalid in configuration.");
+        }
+        
+        _projectClient = new PersistentAgentsClient(agentConfig.ProjectEndpoint, new DefaultAzureCredential());
+        _agentId = agentConfig.AgentId ?? throw new InvalidOperationException("AgentId is required in AzureAIAgentConfiguration.");
+        _streamingResponseManager = streamingResponseManager;
+        _agentResponseProcessor = agentResponseProcessor;
+    }
+
+    /// <summary>
+    /// Handles the welcome message when new members are added to the conversation.
+    /// </summary>
+    [Route(RouteType = RouteType.Conversation, EventName = ConversationUpdateEvents.MembersAdded)]
+    protected async Task WelcomeMessageAsync(ITurnContext turnContext, ITurnState turnState, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(turnContext);
+        ArgumentNullException.ThrowIfNull(turnState);
+
+        if (turnContext.Activity?.MembersAdded == null)
+        {
+            return;
+        }
+
+        foreach (ChannelAccount member in turnContext.Activity.MembersAdded)
+        {
+            if (member.Id != turnContext.Activity.Recipient?.Id)
+            {
+                await turnContext.SendActivityAsync(MessageFactory.Text(WelcomeMessage), cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Processes incoming messages and streams responses from the Azure AI Agent.
+    /// </summary>
+    [Route(RouteType = RouteType.Activity, Type = ActivityTypes.Message, Rank = RouteRank.Last)]
+    protected async Task OnMessageAsync(ITurnContext turnContext, ITurnState turnState, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(turnContext);
+        ArgumentNullException.ThrowIfNull(turnState);
+
+        if (string.IsNullOrEmpty(turnContext.Activity?.Text))
+        {
+            return;
+        }
+
+        var agentModel = await _projectClient.Administration.GetAgentAsync(_agentId, cancellationToken).ConfigureAwait(false);
+        var agent = new AzureAIAgent(agentModel, _projectClient);
+
+        try
+        {
+            await _streamingResponseManager.InitializeResponseAsync(turnContext, turnState, cancellationToken).ConfigureAwait(false);
+            
+            var userMessage = new ChatMessageContent(AuthorRole.User, turnContext.Activity.Text);
+            var processingContext = new MessageProcessingContext();
+
+            await _agentResponseProcessor.ProcessAgentResponseStreamAsync(agent, userMessage, turnContext, processingContext, cancellationToken).ConfigureAwait(false);
+            
+            await _streamingResponseManager.FinalizeResponseAsync(turnContext, processingContext, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            await turnContext.StreamingResponse.EndStreamAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+}

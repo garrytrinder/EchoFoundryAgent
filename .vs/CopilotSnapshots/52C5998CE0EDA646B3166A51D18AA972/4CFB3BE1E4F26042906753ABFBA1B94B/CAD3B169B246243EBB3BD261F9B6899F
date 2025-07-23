@@ -1,0 +1,23 @@
+﻿using Microsoft.SemanticKernel.Agents.AzureAI;
+using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.Agents.Core.Models;
+using EchoAgent.Models;
+using System.Threading;
+
+namespace EchoAgent.Services;
+
+/// <summary>
+/// Service for processing agent responses.
+/// </summary>
+public interface IAgentResponseProcessor
+{
+    /// <summary>
+    /// Processes the streaming response from the Azure AI Agent.
+    /// </summary>
+    Task ProcessAgentResponseStreamAsync(
+        AzureAIAgent agent, 
+        ChatMessageContent userMessage, 
+        ITurnContext turnContext, 
+        MessageProcessingContext context, 
+        CancellationToken cancellationToken);
+}

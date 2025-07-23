@@ -1,0 +1,23 @@
+﻿using Microsoft.Agents.Core.Models;
+using EchoAgent.Models;
+
+namespace EchoAgent.Services;
+
+/// <summary>
+/// Service for processing message content and handling citations.
+/// </summary>
+public interface IMessageContentProcessor
+{
+    /// <summary>
+    /// Processes the text content of message chunks, handling citations and regular text.
+    /// </summary>
+    Task ProcessMessageContentAsync(
+        StreamingChatMessageContent messageChunk, 
+        ITurnContext turnContext, 
+        MessageProcessingContext context);
+
+    /// <summary>
+    /// Processes a pending citation quote and adds the citation reference number.
+    /// </summary>
+    Task ProcessPendingCitationAsync(ITurnContext turnContext, MessageProcessingContext context);
+}

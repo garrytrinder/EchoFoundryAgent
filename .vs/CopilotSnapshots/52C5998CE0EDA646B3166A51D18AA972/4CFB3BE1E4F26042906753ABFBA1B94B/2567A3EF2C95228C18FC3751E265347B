@@ -1,0 +1,63 @@
+﻿using Microsoft.Agents.Core.Models;
+using Microsoft.SemanticKernel.Agents.AzureAI;
+using Microsoft.SemanticKernel.ChatCompletion;
+using EchoAgent.Models;
+
+namespace EchoAgent.Services;
+
+/// <summary>
+/// Service for processing annotations from streaming chat messages.
+/// </summary>
+public class AnnotationProcessor : IAnnotationProcessor
+{
+    private const string CitationLinkUrl = "https://m365.cloud.microsoft/chat";
+
+    /// <summary>
+    /// Processes annotation content from message chunks and builds file references.
+    /// </summary>
+    public async Task ProcessAnnotationsAsync(
+        StreamingChatMessageContent messageChunk, 
+        AzureAIAgent agent, 
+        MessageProcessingContext context, 
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(messageChunk);
+        ArgumentNullException.ThrowIfNull(agent);
+        ArgumentNullException.ThrowIfNull(context);
+
+        var annotations = messageChunk.Items.OfType<StreamingAnnotationContent>();
+        
+        foreach (StreamingAnnotationContent annotation in annotations)
+        {
+            // Skip if we already have this file reference
+            if (context.FileReferences.Any(fr => fr.Quote == annotation.Label)) 
+            {
+                continue;
+            }
+
+            var fileReference = await CreateFileReferenceAsync(annotation, agent, cancellationToken).ConfigureAwait(false);
+            context.FileReferences.Add(fileReference);
+        }
+    }
+
+    /// <summary>
+    /// Creates a file reference from annotation data.
+    /// </summary>
+    public async Task<FileReference> CreateFileReferenceAsync(
+        StreamingAnnotationContent annotation, 
+        AzureAIAgent agent, 
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(annotation);
+        ArgumentNullException.ThrowIfNull(agent);
+
+        var agentFile = await agent.Client.Files.GetFileAsync(annotation.ReferenceId, cancellationToken).ConfigureAwait(false);
+        var citation = new Citation(string.Empty, agentFile.Value.Filename, CitationLinkUrl);
+        
+        return new FileReference(
+            agentFile.Value.Id, 
+            agentFile.Value.Filename, 
+            annotation.Label, 
+            citation);
+    }
+}

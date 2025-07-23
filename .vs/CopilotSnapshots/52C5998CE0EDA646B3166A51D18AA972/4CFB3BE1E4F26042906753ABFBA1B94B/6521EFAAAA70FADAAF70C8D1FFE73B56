@@ -1,0 +1,22 @@
+﻿using Microsoft.Agents.Builder.State;
+using Microsoft.Agents.Core.Models;
+using Microsoft.SemanticKernel.ChatCompletion;
+using EchoAgent.Models;
+
+namespace EchoAgent.Services;
+
+/// <summary>
+/// Service for managing streaming responses.
+/// </summary>
+public interface IStreamingResponseManager
+{
+    /// <summary>
+    /// Initializes the streaming response with working message and message count.
+    /// </summary>
+    Task InitializeResponseAsync(ITurnContext turnContext, ITurnState turnState, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Finalizes the streaming response with metadata and citations.
+    /// </summary>
+    Task FinalizeResponseAsync(ITurnContext turnContext, MessageProcessingContext context, CancellationToken cancellationToken);
+}
