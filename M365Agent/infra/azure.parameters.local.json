@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "resourceBaseName": {
+      "value": "agent${{RESOURCE_SUFFIX}}"
+    },
+    "botEntraAppClientId": {
+      "value": "${{AGENT_ID}}"
+    },
+    "botEntraAppTenantId": {
+      "value": "${{AGENT_TENANT_ID}}"
+    },
+    "messageEndpointDomain": {
+      "value": "${{BOT_DOMAIN}}"
+    },
+    "botDisplayName": {
+      "value": "EchoAgent"
+    }
+  }
+}

@@ -1,6 +1,9 @@
 using EchoAgent;
+using EchoAgent.Agent;
+using Microsoft.Agents.Builder;
 using Microsoft.Agents.Hosting.AspNetCore;
 using Microsoft.Agents.Storage;
+using Microsoft.Agents.Storage.Blobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,8 +20,12 @@ builder.Services.AddBotAspNetAuthentication(builder.Configuration);
 builder.AddAgentApplicationOptions();
 
 // Add the agent (which is transient)
-builder.AddAgent<EchoAgent.Agent.EchoAgent>();
-builder.Services.AddSingleton<IStorage, MemoryStorage>();
+builder.AddAgent<Echo>();
+
+// Configure the storage for the agent
+builder.Services.AddSingleton<IStorage>((sp) => new BlobsStorage(
+    builder.Configuration["BlobsStorageOptions:ConnectionString"],
+    builder.Configuration["BlobsStorageOptions:ContainerName"]));
 
 // Configure AzureAIConfiguration
 builder.Services.AddSingleton(serviceProvider => 
@@ -33,14 +40,18 @@ if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
 }
-app.UseStaticFiles();
 
 app.UseRouting();
-
 app.UseAuthentication();
 app.UseAuthorization();
 
-if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName == "TestTool")
+// Map the /api/messages endpoint to the AgentApplication
+app.MapPost("/api/messages", async (HttpRequest request, HttpResponse response, IAgentHttpAdapter adapter, IAgent agent, CancellationToken cancellationToken) =>
+{
+    await adapter.ProcessAsync(request, response, agent, cancellationToken);
+});
+
+if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName == "Playground")
 {
     app.MapGet("/", () => "Echo Agent");
     app.UseDeveloperExceptionPage();

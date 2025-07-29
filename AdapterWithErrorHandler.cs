@@ -8,7 +8,7 @@ namespace EchoAgent;
 public class AdapterWithErrorHandler : CloudAdapter
 {
     public AdapterWithErrorHandler(IChannelServiceClientFactory channelServiceClientFactory, IActivityTaskQueue activityTaskQueue, ILogger<IAgentHttpAdapter> logger)
-        : base(channelServiceClientFactory, activityTaskQueue, logger: logger)
+        : base(channelServiceClientFactory, activityTaskQueue, logger: (ILogger<CloudAdapter>)logger)
     {
         OnTurnError = async (turnContext, exception) =>
         {
