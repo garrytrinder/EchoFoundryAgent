@@ -85,4 +85,3 @@ deploy:
       # or add it to your environment variable file.
       resourceId: ${{BOT_AZURE_APP_SERVICE_RESOURCE_ID}}
       workingDirectory: ..
-projectId: a39a3841-0f79-488d-8a59-4098e4c83d1e
